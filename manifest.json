@@ -1,7 +1,6 @@
 {
-  "name": "TaskLoom",
-  "short_name": "TaskLoom",
-  "description": "Smart Daily & Routine To-Do",
+  "name": "To-do-list",
+  "short_name": "To-do-list",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

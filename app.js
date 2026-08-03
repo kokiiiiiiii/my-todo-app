@@ -16,6 +16,7 @@ function todoApp() {
 
         // Cloud Sync States
         user: null,
+        authChecked: false,
 
         initApp() {
             const today = new Date();
@@ -97,6 +98,7 @@ function todoApp() {
                 } else {
                     this.user = null;
                 }
+                this.authChecked = true;
             });
         },
 

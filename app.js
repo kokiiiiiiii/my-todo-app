@@ -8,14 +8,14 @@ function todoApp() {
 
         // Form States
         newTaskTitle: '',
-        newTaskImage: null,
         newRoutineTitle: '',
-        newRoutineImage: null,
 
         // Modal & Navigation States
         activeModal: null, // 'routines' | 'monthly' | null
         summaryYearMonth: '', // YYYY-MM
-        lightboxImage: null,
+
+        // Cloud Sync States
+        user: null,
 
         initApp() {
             const today = new Date();
@@ -24,6 +24,7 @@ function todoApp() {
             this.summaryYearMonth = this.todayStr.substring(0, 7);
 
             this.loadData();
+            this.initFirebaseAuth();
 
             // Re-render Lucide icons on Alpine changes
             this.$watch('activeModal', () => this.refreshIcons());
@@ -62,9 +63,9 @@ function todoApp() {
                 } else {
                     // Default Routines for new users
                     this.routines = [
-                        { id: 'r1', title: '朝の水を飲む', image: null },
-                        { id: 'r2', title: 'メールチェック', image: null },
-                        { id: 'r3', title: '部屋の換気・整理', image: null }
+                        { id: 'r1', title: '朝の水を飲む' },
+                        { id: 'r2', title: 'メールチェック' },
+                        { id: 'r3', title: '部屋の換気・整理' }
                     ];
                     this.saveRoutines();
                 }
@@ -75,10 +76,67 @@ function todoApp() {
 
         saveTasks() {
             localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
+            this.syncToCloud();
         },
 
         saveRoutines() {
             localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
+            this.syncToCloud();
+        },
+
+        // Cloud Sync Handlers (Firebase)
+        initFirebaseAuth() {
+            firebase.auth().onAuthStateChanged(async (fbUser) => {
+                if (fbUser) {
+                    this.user = {
+                        uid: fbUser.uid,
+                        displayName: fbUser.displayName,
+                        photoURL: fbUser.photoURL
+                    };
+                    await this.syncFromCloud();
+                } else {
+                    this.user = null;
+                }
+            });
+        },
+
+        async signIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try {
+                await firebase.auth().signInWithPopup(provider);
+            } catch (e) {
+                console.error('Sign-in failed:', e);
+            }
+        },
+
+        signOut() {
+            firebase.auth().signOut();
+        },
+
+        async syncFromCloud() {
+            const docRef = firebase.firestore().collection('users').doc(this.user.uid);
+            try {
+                const snap = await docRef.get();
+                if (snap.exists) {
+                    const data = snap.data();
+                    if (data.tasks) this.tasks = data.tasks;
+                    if (data.routines) this.routines = data.routines;
+                    localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
+                    localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
+                } else {
+                    // First sign-in on this account: upload existing local data as the initial backup
+                    await docRef.set({ tasks: this.tasks, routines: this.routines });
+                }
+            } catch (e) {
+                console.error('Cloud sync failed:', e);
+            }
+        },
+
+        syncToCloud() {
+            if (!this.user) return;
+            firebase.firestore().collection('users').doc(this.user.uid)
+                .set({ tasks: this.tasks, routines: this.routines }, { merge: true })
+                .catch((e) => console.error('Cloud save failed:', e));
         },
 
         // Date Navigation
@@ -126,14 +184,13 @@ function todoApp() {
 
         // Add Task Actions
         addTask() {
-            if (!this.newTaskTitle.trim() && !this.newTaskImage) return;
+            if (!this.newTaskTitle.trim()) return;
 
             const newTask = {
                 id: 't_' + Date.now(),
                 date: this.selectedDate,
-                title: this.newTaskTitle.trim() || '画像タスク',
+                title: this.newTaskTitle.trim(),
                 completed: false,
-                image: this.newTaskImage,
                 createdAt: new Date().toISOString()
             };
 
@@ -142,7 +199,6 @@ function todoApp() {
 
             // Reset form
             this.newTaskTitle = '';
-            this.newTaskImage = null;
         },
 
         toggleTask(taskId) {
@@ -170,7 +226,6 @@ function todoApp() {
                 date: this.selectedDate,
                 title: routine.title,
                 completed: false,
-                image: routine.image || null,
                 createdAt: new Date().toISOString()
             };
             this.tasks.unshift(newTask);
@@ -182,47 +237,18 @@ function todoApp() {
 
             const routine = {
                 id: 'r_' + Date.now(),
-                title: this.newRoutineTitle.trim(),
-                image: this.newRoutineImage
+                title: this.newRoutineTitle.trim()
             };
 
             this.routines.push(routine);
             this.saveRoutines();
 
             this.newRoutineTitle = '';
-            this.newRoutineImage = null;
         },
 
         deleteRoutine(routineId) {
             this.routines = this.routines.filter(r => r.id !== routineId);
             this.saveRoutines();
-        },
-
-        // Image Selection Handler (Base64)
-        handleImageSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.newTaskImage = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        },
-
-        handleRoutineImageSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.newRoutineImage = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        },
-
-        openLightbox(imgSrc) {
-            this.lightboxImage = imgSrc;
         },
 
         // Monthly Summary Actions
@@ -273,14 +299,12 @@ function todoApp() {
                 const dayTasks = this.tasks.filter(t => t.date === dateStr);
                 const total = dayTasks.length;
                 const completed = dayTasks.filter(t => t.completed).length;
-                const hasImage = dayTasks.some(t => t.image);
 
                 dayList.push({
                     dayNum: d,
                     dateStr: dateStr,
                     total: total,
                     completed: completed,
-                    hasImage: hasImage,
                     isToday: dateStr === this.todayStr
                 });
             }

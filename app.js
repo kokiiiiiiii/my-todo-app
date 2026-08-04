@@ -11,7 +11,7 @@ function todoApp() {
         newRoutineTitle: '',
 
         // Modal & Navigation States
-        activeModal: null, // 'routines' | 'monthly' | null
+        activeModal: null, // 'routines' | 'monthly' | 'account' | null
         summaryYearMonth: '', // YYYY-MM
 
         // Cloud Sync States
@@ -93,7 +93,8 @@ function todoApp() {
                     this.user = {
                         uid: fbUser.uid,
                         displayName: fbUser.displayName,
-                        photoURL: fbUser.photoURL
+                        photoURL: fbUser.photoURL,
+                        email: fbUser.email
                     };
                     await this.syncFromCloud();
                 } else {

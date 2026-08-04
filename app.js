@@ -17,6 +17,7 @@ function todoApp() {
         // Cloud Sync States
         user: null,
         authChecked: false,
+        authError: '',
 
         initApp() {
             const today = new Date();
@@ -103,11 +104,13 @@ function todoApp() {
         },
 
         async signIn() {
+            this.authError = '';
             const provider = new firebase.auth.GoogleAuthProvider();
             try {
                 await firebase.auth().signInWithPopup(provider);
             } catch (e) {
                 console.error('Sign-in failed:', e);
+                this.authError = `ログインに失敗しました (${e.code || e.message})`;
             }
         },
 

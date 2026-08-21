@@ -256,13 +256,38 @@
                                     
                                     <!-- Task Content -->
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-sm sm:text-base text-slate-100 break-words font-normal leading-relaxed" x-text="task.title"></p>
+                                        <template x-if="editingTaskId === task.id">
+                                            <input type="text"
+                                                   x-model="editingTaskTitle"
+                                                   @keydown.enter="saveEditTask(task)"
+                                                   @keydown.escape="cancelEditTask()"
+                                                   @click.stop
+                                                   x-init="$el.focus()"
+                                                   class="w-full bg-slate-800 border border-brand-500/60 rounded-lg px-2 py-1 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                        </template>
+                                        <template x-if="editingTaskId !== task.id">
+                                            <p class="text-sm sm:text-base text-slate-100 break-words font-normal leading-relaxed" x-text="task.title"></p>
+                                        </template>
                                     </div>
                                 </div>
 
                                 <!-- Actions -->
                                 <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                                    <button @click="deleteTask(task.id)" 
+                                    <template x-if="editingTaskId === task.id">
+                                        <button @click="saveEditTask(task)"
+                                                class="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                title="保存">
+                                            <i data-lucide="check" class="w-4 h-4"></i>
+                                        </button>
+                                    </template>
+                                    <template x-if="editingTaskId !== task.id">
+                                        <button @click="startEditTask(task)"
+                                                class="p-1.5 text-slate-500 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors"
+                                                title="編集">
+                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                        </button>
+                                    </template>
+                                    <button @click="deleteTask(task.id)"
                                             class="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                             title="削除">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -302,13 +327,38 @@
                                     
                                     <!-- Task Title with Strikethrough Animation -->
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-sm sm:text-base task-text-completed font-normal leading-relaxed break-words" x-text="task.title"></p>
+                                        <template x-if="editingTaskId === task.id">
+                                            <input type="text"
+                                                   x-model="editingTaskTitle"
+                                                   @keydown.enter="saveEditTask(task)"
+                                                   @keydown.escape="cancelEditTask()"
+                                                   @click.stop
+                                                   x-init="$el.focus()"
+                                                   class="w-full bg-slate-800 border border-brand-500/60 rounded-lg px-2 py-1 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                        </template>
+                                        <template x-if="editingTaskId !== task.id">
+                                            <p class="text-sm sm:text-base task-text-completed font-normal leading-relaxed break-words" x-text="task.title"></p>
+                                        </template>
                                     </div>
                                 </div>
 
                                 <!-- Actions -->
                                 <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                    <button @click="deleteTask(task.id)" 
+                                    <template x-if="editingTaskId === task.id">
+                                        <button @click="saveEditTask(task)"
+                                                class="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                title="保存">
+                                            <i data-lucide="check" class="w-4 h-4"></i>
+                                        </button>
+                                    </template>
+                                    <template x-if="editingTaskId !== task.id">
+                                        <button @click="startEditTask(task)"
+                                                class="p-1.5 text-slate-500 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors"
+                                                title="編集">
+                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                        </button>
+                                    </template>
+                                    <button @click="deleteTask(task.id)"
                                             class="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                             title="削除">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -374,11 +424,34 @@
 
                 <template x-for="routine in routines" :key="routine.id">
                     <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <span class="text-sm text-slate-200 font-medium truncate" x-text="routine.title"></span>
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <template x-if="editingRoutineId === routine.id">
+                                <input type="text"
+                                       x-model="editingRoutineTitle"
+                                       @keydown.enter="saveEditRoutine(routine)"
+                                       @keydown.escape="cancelEditRoutine()"
+                                       @click.stop
+                                       x-init="$el.focus()"
+                                       class="w-full bg-slate-900 border border-brand-500/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            </template>
+                            <template x-if="editingRoutineId !== routine.id">
+                                <span class="text-sm text-slate-200 font-medium truncate" x-text="routine.title"></span>
+                            </template>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button @click="addFromRoutine(routine); activeModal = null" 
+                        <div class="flex items-center gap-2 shrink-0">
+                            <template x-if="editingRoutineId === routine.id">
+                                <button @click="saveEditRoutine(routine)"
+                                        class="text-slate-500 hover:text-emerald-400 p-1" title="保存">
+                                    <i data-lucide="check" class="w-4 h-4"></i>
+                                </button>
+                            </template>
+                            <template x-if="editingRoutineId !== routine.id">
+                                <button @click="startEditRoutine(routine)"
+                                        class="text-slate-500 hover:text-brand-400 p-1" title="編集">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                            </template>
+                            <button @click="addFromRoutine(routine); activeModal = null"
                                     class="px-2.5 py-1 bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 border border-brand-500/30 rounded-lg text-xs font-medium transition-colors">
                                 今日に追加
                             </button>

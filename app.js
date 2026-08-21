@@ -10,6 +10,12 @@ function todoApp() {
         newTaskTitle: '',
         newRoutineTitle: '',
 
+        // Edit States
+        editingTaskId: null,
+        editingTaskTitle: '',
+        editingRoutineId: null,
+        editingRoutineTitle: '',
+
         // Modal & Navigation States
         activeModal: null, // 'routines' | 'monthly' | 'account' | null
         summaryYearMonth: '', // YYYY-MM
@@ -33,6 +39,8 @@ function todoApp() {
             this.$watch('selectedDate', () => this.refreshIcons());
             this.$watch('tasks', () => this.refreshIcons());
             this.$watch('routines', () => this.refreshIcons());
+            this.$watch('editingTaskId', () => this.refreshIcons());
+            this.$watch('editingRoutineId', () => this.refreshIcons());
 
             setTimeout(() => this.refreshIcons(), 50);
         },
@@ -220,6 +228,25 @@ function todoApp() {
             this.saveTasks();
         },
 
+        startEditTask(task) {
+            this.editingTaskId = task.id;
+            this.editingTaskTitle = task.title;
+        },
+
+        saveEditTask(task) {
+            const trimmed = this.editingTaskTitle.trim();
+            if (trimmed) {
+                task.title = trimmed;
+                this.saveTasks();
+            }
+            this.cancelEditTask();
+        },
+
+        cancelEditTask() {
+            this.editingTaskId = null;
+            this.editingTaskTitle = '';
+        },
+
         clearCompletedForDay() {
             this.tasks = this.tasks.filter(t => !(t.date === this.selectedDate && t.completed));
             this.saveTasks();
@@ -255,6 +282,25 @@ function todoApp() {
         deleteRoutine(routineId) {
             this.routines = this.routines.filter(r => r.id !== routineId);
             this.saveRoutines();
+        },
+
+        startEditRoutine(routine) {
+            this.editingRoutineId = routine.id;
+            this.editingRoutineTitle = routine.title;
+        },
+
+        saveEditRoutine(routine) {
+            const trimmed = this.editingRoutineTitle.trim();
+            if (trimmed) {
+                routine.title = trimmed;
+                this.saveRoutines();
+            }
+            this.cancelEditRoutine();
+        },
+
+        cancelEditRoutine() {
+            this.editingRoutineId = null;
+            this.editingRoutineTitle = '';
         },
 
         // Monthly Summary Actions

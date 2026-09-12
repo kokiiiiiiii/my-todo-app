@@ -86,12 +86,19 @@ function todoApp() {
 
         saveTasks() {
             localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
-            this.syncToCloud();
+            this.touchAndSync();
         },
 
         saveRoutines() {
             localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
-            this.syncToCloud();
+            this.touchAndSync();
+        },
+
+        // この端末で「今この瞬間」変更したことを記録してからクラウドに送る
+        touchAndSync() {
+            const now = Date.now();
+            localStorage.setItem('taskloom_updatedAt', String(now));
+            this.syncToCloud(now);
         },
 
         // Cloud Sync Handlers (Firebase)
@@ -133,23 +140,37 @@ function todoApp() {
                 const snap = await docRef.get();
                 if (snap.exists) {
                     const data = snap.data();
-                    if (data.tasks) this.tasks = data.tasks;
-                    if (data.routines) this.routines = data.routines;
-                    localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
-                    localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
+                    const cloudUpdatedAt = data.updatedAt || 0;
+                    const localUpdatedAt = Number(localStorage.getItem('taskloom_updatedAt') || 0);
+
+                    if (localUpdatedAt > cloudUpdatedAt) {
+                        // このデバイスの方が新しい変更を持っている
+                        // (直前の保存がクラウドに届く前に閉じた可能性がある) → クラウドを上書きし直す
+                        await this.syncToCloud(localUpdatedAt);
+                    } else {
+                        // クラウドの方が新しい(他デバイスでの変更など) → こちらを採用
+                        if (data.tasks) this.tasks = data.tasks;
+                        if (data.routines) this.routines = data.routines;
+                        localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
+                        localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
+                        localStorage.setItem('taskloom_updatedAt', String(cloudUpdatedAt));
+                    }
                 } else {
-                    // First sign-in on this account: upload existing local data as the initial backup
-                    await docRef.set({ tasks: this.tasks, routines: this.routines });
+                    // 初回ログイン: 今あるローカルデータをそのままバックアップとしてアップロード
+                    const now = Date.now();
+                    localStorage.setItem('taskloom_updatedAt', String(now));
+                    await docRef.set({ tasks: this.tasks, routines: this.routines, updatedAt: now });
                 }
             } catch (e) {
                 console.error('Cloud sync failed:', e);
             }
         },
 
-        syncToCloud() {
+        syncToCloud(updatedAt) {
             if (!this.user) return;
-            firebase.firestore().collection('users').doc(this.user.uid)
-                .set({ tasks: this.tasks, routines: this.routines }, { merge: true })
+            const ts = updatedAt || Date.now();
+            return firebase.firestore().collection('users').doc(this.user.uid)
+                .set({ tasks: this.tasks, routines: this.routines, updatedAt: ts }, { merge: true })
                 .catch((e) => console.error('Cloud save failed:', e));
         },
 

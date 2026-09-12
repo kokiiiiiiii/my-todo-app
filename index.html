@@ -220,21 +220,6 @@
             </form>
         </section>
 
-        <!-- Carry Over Past Incomplete Tasks Banner (only shown when viewing today) -->
-        <template x-if="selectedDate === todayStr && pastIncompleteTasks.length > 0">
-            <section class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-2.5 text-amber-300 text-sm">
-                    <i data-lucide="history" class="w-4 h-4 shrink-0"></i>
-                    <span>過去に達成できなかったタスクが <b x-text="pastIncompleteTasks.length"></b> 件あります</span>
-                </div>
-                <button @click="carryOverPastTasks()"
-                        class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all active:scale-95">
-                    <i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i>
-                    <span>今日に追加</span>
-                </button>
-            </section>
-        </template>
-
         <!-- Tasks Container -->
         <section class="flex flex-col gap-6">
 
@@ -288,6 +273,22 @@
 
                                 <!-- Actions -->
                                 <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <!-- Add to Today (only shown when viewing a past date) -->
+                                    <template x-if="task.date !== todayStr && task.lastCarriedDate !== todayStr">
+                                        <button @click="addSingleTaskToToday(task)"
+                                                class="px-2 py-1.5 text-brand-400 hover:text-brand-300 hover:bg-brand-500/10 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+                                                title="今日のタスクとして追加">
+                                            <i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i>
+                                            <span class="hidden sm:inline">今日に追加</span>
+                                        </button>
+                                    </template>
+                                    <template x-if="task.date !== todayStr && task.lastCarriedDate === todayStr">
+                                        <span class="px-2 py-1.5 text-emerald-400/80 flex items-center gap-1 text-xs font-medium"
+                                              title="今日のタスクに追加済みです">
+                                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                            <span class="hidden sm:inline">追加済み</span>
+                                        </span>
+                                    </template>
                                     <template x-if="editingTaskId === task.id">
                                         <button @click="saveEditTask(task)"
                                                 class="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"

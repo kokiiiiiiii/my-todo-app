@@ -236,8 +236,7 @@ function todoApp() {
             return this.currentDayTasks.filter(t => t.completed);
         },
 
-        // 今日より前の日付にある、まだ完了していないタスク一覧
-        // (すでに今日コピー済みのものは、二重に出さないよう除外)
+        // 今日より前の日付にある、まだ完了していないタスク一覧(参考用に残置)
         get pastIncompleteTasks() {
             return this.tasks.filter(t =>
                 t.date < this.todayStr &&
@@ -246,25 +245,18 @@ function todoApp() {
             );
         },
 
-        // 過去の未完了タスクは元の日付・完了状態のまま残し、今日のタスクとして「コピー」を追加する
-        carryOverPastTasks() {
-            const past = this.pastIncompleteTasks;
-            if (past.length === 0) return;
-
-            past.forEach(t => {
-                const copy = {
-                    id: 't_' + Date.now() + Math.random().toString(36).substr(2, 4),
-                    date: this.todayStr,
-                    title: t.title,
-                    completed: false,
-                    createdAt: new Date().toISOString()
-                };
-                this.tasks.unshift(copy);
-                // 元のタスクは変更しない(過去の記録として残す)。
-                // ただし「今日すでに持ち越し済み」の印だけ付けて、連打での二重追加を防ぐ
-                t.lastCarriedDate = this.todayStr;
-            });
-
+        // 過去のタスク1件を、元の記録は残したまま「今日のタスク」としてコピー追加する
+        addSingleTaskToToday(task) {
+            const copy = {
+                id: 't_' + Date.now() + Math.random().toString(36).substr(2, 4),
+                date: this.todayStr,
+                title: task.title,
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+            this.tasks.unshift(copy);
+            // 元のタスクの日付・完了状態は変更しない(過去の記録として残す)
+            task.lastCarriedDate = this.todayStr;
             this.saveTasks();
         },
 

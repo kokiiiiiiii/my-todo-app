@@ -17,8 +17,14 @@ function todoApp() {
         editingRoutineTitle: '',
 
         // Modal & Navigation States
-        activeModal: null, // 'routines' | 'monthly' | 'account' | null
+        activeModal: null, // 'routines' | 'monthly' | 'account' | 'confirm' | null
         summaryYearMonth: '', // YYYY-MM
+
+        // Confirm Dialog States (汎用の確認ダイアログ)
+        confirmTitle: '',
+        confirmMessage: '',
+        confirmActionLabel: '確認',
+        pendingAction: null,
 
         // Cloud Sync States
         user: null,
@@ -437,6 +443,23 @@ function todoApp() {
         selectDateFromCalendar(dateStr) {
             this.selectedDate = dateStr;
             this.activeModal = null;
+        },
+
+        // 汎用の確認ダイアログを開く。actionFnは「はい」を押した時に実行する処理
+        openConfirm(title, message, actionFn, actionLabel = '確認') {
+            this.confirmTitle = title;
+            this.confirmMessage = message;
+            this.confirmActionLabel = actionLabel;
+            this.pendingAction = actionFn;
+            this.activeModal = 'confirm';
+        },
+
+        // 確認ダイアログで「はい」が押された時に呼ばれる
+        runConfirmedAction() {
+            const action = this.pendingAction;
+            this.pendingAction = null;
+            this.activeModal = null;
+            if (action) action();
         }
     };
 }

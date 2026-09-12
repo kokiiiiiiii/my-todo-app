@@ -24,6 +24,8 @@ function todoApp() {
         user: null,
         authChecked: false,
         authError: '',
+        syncStatus: '', // '' | 'saving' | 'saved'
+        _syncTimer: null,
 
         initApp() {
             const today = new Date();
@@ -86,24 +88,29 @@ function todoApp() {
 
         saveTasks() {
             localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
-            this.touchAndSync();
+            this.queueCloudSync();
         },
 
         saveRoutines() {
             localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
-            this.touchAndSync();
+            this.queueCloudSync();
         },
 
-        // この端末で「今この瞬間」変更したことを記録してからクラウドに送る
-        touchAndSync() {
-            const now = Date.now();
-            localStorage.setItem('taskloom_updatedAt', String(now));
-            this.syncToCloud(now);
+        // ローカル保存は常に即座。クラウド送信は連打・連続操作をまとめるため
+        // 2秒間操作が無かったタイミングでバックグラウンドで1回だけ送る(デバウンス)。
+        // これにより「保存できたか待つ」体感の遅さが無くなる。
+        queueCloudSync() {
+            if (!this.user) return;
+            this.syncStatus = 'saving';
+            clearTimeout(this._syncTimer);
+            this._syncTimer = setTimeout(() => {
+                this.syncToCloud();
+            }, 2000);
         },
 
         // Cloud Sync Handlers (Firebase)
         initFirebaseAuth() {
-            firebase.auth().onAuthStateChanged(async (fbUser) => {
+            firebase.auth().onAuthStateChanged((fbUser) => {
                 if (fbUser) {
                     this.user = {
                         uid: fbUser.uid,
@@ -111,11 +118,30 @@ function todoApp() {
                         photoURL: fbUser.photoURL,
                         email: fbUser.email
                     };
-                    await this.syncFromCloud();
+                    // 画面はローカルデータで即座に表示する(クラウド確認を待たない = 体感速度が速い)
+                    this.authChecked = true;
+
+                    // この端末にまだ実質データが無い(新しい端末/入れ直し直後)場合だけ、
+                    // 自動でクラウドから復元を試みる。データが既にある通常時は何もしない
+                    // (=自動で上書きされることは無くなり、消失事故が起きなくなる)
+                    const hasLocalTasks = this.tasks.length > 0;
+                    const hasCustomRoutines = this.routines.some(r => !['r1', 'r2', 'r3'].includes(r.id));
+                    if (!hasLocalTasks && !hasCustomRoutines) {
+                        this.restoreFromCloud({ silent: true });
+                    }
                 } else {
                     this.user = null;
+                    this.authChecked = true;
                 }
-                this.authChecked = true;
+            });
+
+            // タブを閉じる/切り替える直前に、保留中のクラウド送信があれば待たずに即実行しておく
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden' && this._syncTimer) {
+                    clearTimeout(this._syncTimer);
+                    this._syncTimer = null;
+                    this.syncToCloud();
+                }
             });
         },
 
@@ -134,44 +160,44 @@ function todoApp() {
             firebase.auth().signOut();
         },
 
-        async syncFromCloud() {
+        // クラウドは「バックアップ先」として使う。普段の画面表示・保存は常にローカルが正。
+        // クラウドからの取り込みは (1) 新しい端末で開いた初回、(2) ユーザーが手動で
+        // 「クラウドから復元」を押した時、の2パターンのみに限定し、自動で毎回上書きしない。
+        async restoreFromCloud({ silent = false } = {}) {
+            if (!this.user) return;
             const docRef = firebase.firestore().collection('users').doc(this.user.uid);
             try {
                 const snap = await docRef.get();
                 if (snap.exists) {
                     const data = snap.data();
-                    const cloudUpdatedAt = data.updatedAt || 0;
-                    const localUpdatedAt = Number(localStorage.getItem('taskloom_updatedAt') || 0);
-
-                    if (localUpdatedAt > cloudUpdatedAt) {
-                        // このデバイスの方が新しい変更を持っている
-                        // (直前の保存がクラウドに届く前に閉じた可能性がある) → クラウドを上書きし直す
-                        await this.syncToCloud(localUpdatedAt);
-                    } else {
-                        // クラウドの方が新しい(他デバイスでの変更など) → こちらを採用
-                        if (data.tasks) this.tasks = data.tasks;
-                        if (data.routines) this.routines = data.routines;
-                        localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
-                        localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
-                        localStorage.setItem('taskloom_updatedAt', String(cloudUpdatedAt));
+                    if (!silent) {
+                        const ok = confirm('クラウドのバックアップでこの端末のタスクを上書きします。よろしいですか?');
+                        if (!ok) return;
                     }
-                } else {
-                    // 初回ログイン: 今あるローカルデータをそのままバックアップとしてアップロード
-                    const now = Date.now();
-                    localStorage.setItem('taskloom_updatedAt', String(now));
-                    await docRef.set({ tasks: this.tasks, routines: this.routines, updatedAt: now });
+                    if (data.tasks) this.tasks = data.tasks;
+                    if (data.routines) this.routines = data.routines;
+                    localStorage.setItem('taskloom_tasks', JSON.stringify(this.tasks));
+                    localStorage.setItem('taskloom_routines', JSON.stringify(this.routines));
+                    if (!silent) alert('復元しました');
+                } else if (!silent) {
+                    alert('クラウドにバックアップがまだありません');
                 }
             } catch (e) {
-                console.error('Cloud sync failed:', e);
+                console.error('Restore from cloud failed:', e);
+                if (!silent) alert('復元に失敗しました');
             }
         },
 
-        syncToCloud(updatedAt) {
+        syncToCloud() {
             if (!this.user) return;
-            const ts = updatedAt || Date.now();
-            return firebase.firestore().collection('users').doc(this.user.uid)
-                .set({ tasks: this.tasks, routines: this.routines, updatedAt: ts }, { merge: true })
-                .catch((e) => console.error('Cloud save failed:', e));
+            this.syncStatus = 'saving';
+            firebase.firestore().collection('users').doc(this.user.uid)
+                .set({ tasks: this.tasks, routines: this.routines, updatedAt: Date.now() }, { merge: true })
+                .then(() => { this.syncStatus = 'saved'; })
+                .catch((e) => {
+                    console.error('Cloud save failed:', e);
+                    this.syncStatus = '';
+                });
         },
 
         // Date Navigation
